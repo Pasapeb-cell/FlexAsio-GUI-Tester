@@ -2,3 +2,9 @@
 .vs/
 CMakeSettings.json
 out/
+
+# CMake build output
+build/
+
+# Claude Code harness-local files
+.claude/

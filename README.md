@@ -1,158 +1,159 @@
-# FlexASIO, the flexible universal ASIO driver
-*Brought to you by [Etienne Dechamps][] - [GitHub][]*
+# FlexASIO GUI Tester
+
+*A fork of [FlexASIO][upstream] by [Etienne Dechamps][] that adds a graphical
+settings editor, a latency visualizer, and — the main point — an **audio dropout
+tester** that lets you find a stable buffer size without touching your DAW.*
 
 *ASIO is a trademark and software of Steinberg Media Technologies GmbH*
 
-**If you are looking for an installer, see the
-[GitHub releases page][releases].**
+## Why this fork exists
 
-## Description
+[FlexASIO][upstream] is an excellent universal ASIO driver, but tuning it is
+tedious. Its settings live in a hand-edited [`FlexASIO.toml`][CONFIGURATION] file,
+and finding the lowest buffer size that doesn't crackle means repeating this loop:
 
-FlexASIO is a *universal [ASIO][] driver*, meaning that it is not tied to
-specific audio hardware. Other examples of universal ASIO drivers include
-[ASIO4ALL][], [ASIO2KS][], [ASIO2WASAPI][]. [KoordASIO][] is a derivative of
-FlexASIO that focuses on WASAPI and user convenience.
+1. Close the DAW that's holding the audio device
+2. Edit `FlexASIO.toml` by hand
+3. Reopen the DAW and load a project
+4. Play something and listen for crackling
+5. Guess a new buffer size, go to step 1
 
-Universal ASIO drivers use hardware-agnostic audio interfaces provided by the
-operating system to produce and consume sound. The typical use case for such a
-driver is to make ASIO usable with audio hardware that doesn't come with its own
-ASIO drivers, or where the bundled ASIO drivers don't provide the desired
-functionality.
+This fork collapses that loop into a single window. The tester plays audio through
+**PortAudio** — the same library FlexASIO itself uses — with the same backend,
+device, and buffer size you've configured. So a buffer size that tests clean here
+behaves the same way when FlexASIO uses it, and you never have to open your DAW to
+find out.
 
-While ASIO4ALL and ASIO2KS use a low-level Windows audio API known as
-*[Kernel Streaming]* (also called "DirectKS", "WDM-KS") to operate, and
-ASIO2WASAPI uses [WASAPI][] (in exclusive mode only), FlexASIO differentiates
-itself by using an intermediate library called [PortAudio][] that itself
-supports a large number of operating system sound APIs, which includes Kernel
-Streaming and WASAPI (in shared *and* exclusive mode), but also the more mundane
-APIs [MME][] and [DirectSound][]. Thus FlexASIO can be used to interface with
-*any* sound API available on a Windows system. For more information, see the
-[backends documentation][BACKENDS].
+## What's added
 
-Among other things, this makes it possible to emulate a typical Windows
-application that opens an audio device in *shared mode*. This means other
-applications can use the same audio devices at the same time, with the
-Windows audio engine mixing the various audio streams. Other universal ASIO
-drivers do not offer this functionality as they always open audio devices in
-*exclusive mode*.
+Everything upstream does is unchanged. This fork adds one new component,
+`FlexASIOGUI.exe`, with three tabs:
 
-## Requirements
+### Settings
 
- - Windows Vista or later
- - Compatible with 32-bit and 64-bit ASIO Host Applications
+A visual editor for `FlexASIO.toml`. Pick your backend and devices from dropdowns
+populated by live PortAudio device enumeration, so the device names always match
+what FlexASIO expects. Covers buffer size, channel counts, sample types, suggested
+latency, and the WASAPI-specific options (exclusive mode, auto-convert, explicit
+sample format), which appear only when the WASAPI backend is selected.
 
-## Usage
+Settings that FlexASIO treats as "auto" when absent — sample type and suggested
+latency — keep an explicit *Auto* option, so opening the GUI and saving won't
+silently replace auto-detection with a fixed value.
 
-After running the [installer][releases], FlexASIO should appear in the ASIO
-driver list of any ASIO Host Application (e.g. Cubase, Sound Forge, Room EQ
-Wizard).
+### Latency
 
-The default settings are as follows:
+A breakdown of where your latency actually comes from: the ASIO buffer, PortAudio's
+own buffering, and the Windows audio engine (which WASAPI Exclusive and WDM-KS
+bypass entirely). Alongside it, a comparison table of common buffer sizes with
+their latency and a rough stability-risk rating, so you can see the tradeoff before
+committing to a number.
 
- - DirectSound [backend][BACKENDS]
- - Uses the Windows default recording and playback audio devices
- - 32-bit float sample type
- - 20 ms "preferred" buffer size
+These are *estimates* derived from FlexASIO's own latency model, not measurements.
+Use the Tester tab to find out what actually works.
 
-All of the above can be customized using a [configuration file][CONFIGURATION].
-You might want to use a third-party tool such as flipswitchingmonkey's
-[FlexASIO GUI][FlexASIO_GUI] to make this easier.
+### Tester
 
-For more advanced use cases, such as low-latency operation and bit-perfect
-streaming, see the [FAQ][].
+The reason this fork exists.
 
-## Troubleshooting
+- Plays a **440 Hz sine**, **pink noise**, or a **20 Hz–20 kHz sweep** through the
+  configured device
+- Detects dropouts using PortAudio's `paOutputUnderflow` flag — the authoritative
+  signal, raised inside PortAudio's own high-priority audio thread when the
+  hardware needed samples that weren't ready
+- Shows a live **green / yellow / red** verdict, dropout count, and glitch rate
+- Lets you **drag the buffer size while audio is playing** and hear/see the effect
+  within a couple hundred milliseconds
+- **Auto-Tune** binary-searches common buffer sizes (32 … 4096), testing each for a
+  few seconds, and reports the smallest one that produced zero dropouts
+- **Apply to FlexASIO.toml** writes the result straight into your config
 
-The [FAQ][] provides information on how to deal with common issues. Otherwise,
-FlexASIO provides a number of troubleshooting tools described below.
+Because FlexASIO watches its config file and resets when it changes, an ASIO host
+that's already running will generally pick up the new buffer size on its own.
 
-### Logging
+## Status
 
-FlexASIO includes a logging system that describes everything that is
-happening within the driver in an excruciating amount of detail. It is
-especially useful for troubleshooting driver initialization failures and
-other issues. It can also be used for verification (e.g. to double-check
-that FlexASIO is using the device and audio format that you expect).
+Working and usable, built and smoke-tested on Windows 11 with MSVC 2022 and Qt 6.8.1.
 
-To enable logging, simply create an empty file (e.g. with Notepad) named
-`FlexASIO.log` directly under your user directory (e.g.
-`C:\Users\Your Name Here\FlexASIO.log`). Then restart your ASIO Host
-Application. FlexASIO will notice the presence of the file and start
-logging to it.
+Not yet done: config-file change watching in the GUI, theming, an app icon, and a
+packaged installer. **There is no release build yet — you'll need to build from
+source** (see below). Input/recording testing isn't implemented; the tester is
+output-only, which covers the playback-crackling case that motivated this fork.
 
-Note that the contents of the log file are intended for consumption by
-developers. That said, grave errors should stick out in an obvious way
-(especially if you look towards the end of the log). If you are having
-trouble interpreting the contents of the log, feel free to
-[ask for help][report].
+## Building
 
-*Do not forget to remove the logfile once you're done with it* (or move
-it elsewhere). Indeed, logging slows down FlexASIO, which can lead to
-discontinuities (audio glitches). The logfile can also grow to a very
-large size over time. To prevent accidental disk space exhaustion, FlexASIO will
-stop logging if the logfile exceeds 1 GB.
+You'll need Visual Studio 2022 Build Tools with the **Desktop development with C++**
+workload *and* the **ATL** component (`Microsoft.VisualStudio.Component.VC.ATL` —
+upstream's COM code needs `atlbase.h`, and it isn't in the default workload), plus
+CMake and Qt 6 for MSVC 2022.
 
-### Device list program
+The quickest way to get Qt is prebuilt binaries via [`aqtinstall`][aqtinstall]:
 
-FlexASIO includes a program that can be used to get the list of all the audio
-devices that PortAudio (and therefore FlexASIO) knows about, as well as detailed
-information about each device.
+```
+pip install aqtinstall
+python -m aqt install-qt windows desktop 6.8.1 win64_msvc2022_64 -O C:/Qt
+```
 
-The program is called `PortAudioDevices.exe` and can be found in the `x64`
-(64-bit) or `x86` (32-bit) subfolder in the FlexASIO installation
-folder. It is a console program that should be run from the command line. It
-doesn't matter much which one you use.
+Then clone with submodules and build:
 
-### Test program
+```
+git clone --recursive https://github.com/Pasapeb-cell/FlexAsio-GUI-Tester.git
+cd FlexAsio-GUI-Tester
+set FLEXASIOGUI_QT_DIR=C:/Qt/6.8.1/msvc2022_64
+cmake -G "Visual Studio 17 2022" -A x64 -S src -B build
+cmake --build build --config Release
+```
 
-FlexASIO includes a rudimentary self-test program that can help diagnose
-issues in some cases. It attempts to emulate what a basic ASIO host
-application would do in a controlled, easily reproducible environment.
+`FLEXASIOGUI_QT_DIR` is how the superbuild passes `CMAKE_PREFIX_PATH` down to the
+GUI so `find_package(Qt6)` can find it. The result lands in
+`build/install/bin/FlexASIOGUI.exe`, with the Qt runtime deployed alongside it.
 
-The program is called `FlexASIOTest.exe` and can be found in the `x64`
-(64-bit) or `x86` (32-bit) subfolder in the FlexASIO installation
-folder. It is a console program that should be run from the command
-line.
+## Upstream documentation
 
-It is a good idea to have [logging][] enabled while running the test.
+The original FlexASIO docs still apply to the driver itself and remain the best
+reference:
 
-Note that a successful test run does not necessarily mean FlexASIO is
-not at fault. Indeed it might be that the ASIO host application that
-you're using is triggering a pathological case in FlexASIO. If you
-suspect that's the case, please feel free to [ask for help][report].
+- [Configuration reference][CONFIGURATION] — every `FlexASIO.toml` option
+- [Backends][BACKENDS] — how MME, DirectSound, WASAPI, and WDM-KS differ, and
+  which to pick
+- [FAQ][] — low-latency operation, bit-perfect streaming, troubleshooting
 
-## Reporting issues, feedback, feature requests
+Upstream also ships `PortAudioDevices.exe` (dumps everything PortAudio knows about
+your devices) and `FlexASIOTest.exe` (a console ASIO self-test); both are built by
+this fork too. Creating an empty `FlexASIO.log` in your user directory enables
+detailed driver logging — remember to delete it afterward, since logging itself can
+cause glitches.
 
-FlexASIO welcomes feedback. Feel free to [file an issue][] in the
-[GitHub issue tracker][], if there isn't one already.
+## Credits and license
 
-When asking for help, it is strongly recommended to [produce a log][logging]
-while the problem is occurring, and attach it to your report. The output of
-[`FlexASIOTest`][test], along with its log output, might also help.
+FlexASIO is the work of [Etienne Dechamps][] and its contributors — all the hard
+parts (the ASIO implementation, the PortAudio integration, the configuration
+system) are theirs. This fork only adds a GUI on top. If FlexASIO is useful to you,
+please [support the upstream project][upstream].
+
+There is also a separate, longer-established third-party configuration GUI,
+flipswitchingmonkey's [FlexASIO GUI][FlexASIO_GUI], which upstream recommends. It
+is a settings editor rather than a dropout tester; if configuration is all you
+need, it's more mature than this fork.
+
+Licensed under the MIT License, same as upstream — see [LICENSE.txt][]. The ASIO
+trademark and SDK are subject to Steinberg's own license terms.
+
+**Bugs in the GUI belong [here][fork issues]. Bugs in the driver itself belong
+[upstream][upstream issues]** — please don't send FlexASIO's maintainer issues
+caused by this fork.
 
 ---
 
 ![ASIO logo](ASIO.jpg)
 
-[ASIO]: http://en.wikipedia.org/wiki/Audio_Stream_Input/Output
-[ASIO2KS]: http://www.asio2ks.de/
-[ASIO2WASAPI]: https://github.com/levmin/ASIO2WASAPI
-[ASIO4ALL]: http://www.asio4all.org/
+[aqtinstall]: https://github.com/miurahr/aqtinstall
 [BACKENDS]: BACKENDS.md
 [CONFIGURATION]: CONFIGURATION.md
-[DirectSound]: https://en.wikipedia.org/wiki/DirectSound
 [Etienne Dechamps]: mailto:etienne@edechamps.fr
 [FAQ]: FAQ.md
 [FlexASIO_GUI]: https://github.com/flipswitchingmonkey/FlexASIO_GUI
-[file an issue]: https://github.com/dechamps/FlexASIO/issues/new
-[GitHub]: https://github.com/dechamps/FlexASIO
-[GitHub issue tracker]: https://github.com/dechamps/FlexASIO/issues
-[logging]: #logging
-[MME]: https://en.wikipedia.org/wiki/Windows_legacy_audio_components#Multimedia_Extensions_(MME)
-[Kernel Streaming]: https://en.wikipedia.org/wiki/Windows_legacy_audio_components#Kernel_Streaming
-[KoordASIO]: https://github.com/koord-live/KoordASIO
-[PortAudio]: http://www.portaudio.com/
-[releases]: https://github.com/dechamps/FlexASIO/releases
-[report]: #reporting-issues-feedback-feature-requests
-[test]: #test-program
-[WASAPI]: https://docs.microsoft.com/en-us/windows/desktop/coreaudio/wasapi
+[fork issues]: https://github.com/Pasapeb-cell/FlexAsio-GUI-Tester/issues
+[LICENSE.txt]: LICENSE.txt
+[upstream]: https://github.com/dechamps/FlexASIO
+[upstream issues]: https://github.com/dechamps/FlexASIO/issues

@@ -7,6 +7,9 @@ set(INTERNAL_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/install")
 set(CMAKE_ARGS
     "-DCMAKE_INSTALL_PREFIX=${INTERNAL_INSTALL_PREFIX}"
     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}"
+    # Some vendored dependencies (portaudio, libsndfile) declare cmake_minimum_required()
+    # versions older than 3.5, which CMake >= 4.0 refuses to configure by default.
+    "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
 )
 
 include(check_git_submodule.cmake)
@@ -108,7 +111,9 @@ ExternalProject_Add(
     SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/flexasio"
     BUILD_ALWAYS TRUE USES_TERMINAL_BUILD TRUE
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
-    CMAKE_ARGS ${CMAKE_ARGS}
+    # FlexASIOGUI needs Qt6, which is a prebuilt (not vendored/superbuilt) dependency -
+    # point CMake's find_package(Qt6) at it via CMAKE_PREFIX_PATH.
+    CMAKE_ARGS ${CMAKE_ARGS} "-DCMAKE_PREFIX_PATH=$ENV{FLEXASIOGUI_QT_DIR}"
     DEPENDS tinytoml portaudio dechamps_cpputil dechamps_cpplog dechamps_ASIOUtil ASIOTest
 )
 
