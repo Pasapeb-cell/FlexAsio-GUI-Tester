@@ -22,6 +22,10 @@ namespace flexasio_gui {
 		uint64_t totalDropouts = 0;
 		uint64_t windowCallbacks = 0;
 		uint64_t windowDropouts = 0;
+		float peakLeft = 0.0f;
+		float peakRight = 0.0f;
+		double actualOutputLatencySeconds = 0.0;
+		double streamCpuLoadPercent = 0.0;
 		double elapsedSeconds = 0;
 	};
 
@@ -82,10 +86,15 @@ namespace flexasio_gui {
 
 		std::atomic<uint64_t> totalCallbacks{0};
 		std::atomic<uint64_t> totalDropouts{0};
+		// Peaks are stored as 0..1000 integers so the audio callback never needs to
+		// synchronize floating point state with the GUI thread.
+		std::atomic<int> peakLeft{0};
+		std::atomic<int> peakRight{0};
 
 		uint64_t lastPolledCallbacks = 0;
 		uint64_t lastPolledDropouts = 0;
 		std::chrono::steady_clock::time_point startTime;
+		double actualOutputLatencySeconds = 0.0;
 
 		QTimer* pollTimer = nullptr;
 	};

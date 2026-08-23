@@ -10,10 +10,13 @@ class QComboBox;
 class QSpinBox;
 class QDoubleSpinBox;
 class QCheckBox;
-class QGroupBox;
 class QSlider;
+class QFileSystemWatcher;
+class QTimer;
 
 namespace flexasio_gui {
+
+	class AngularPanel;
 
 	// Editor for FlexASIO.toml: backend, buffer size, and per-direction (input/output)
 	// device, channel, sample type, latency, and WASAPI options.
@@ -49,7 +52,7 @@ namespace flexasio_gui {
 
 	private:
 		struct StreamControls {
-			QGroupBox* group = nullptr;
+			AngularPanel* panel = nullptr;
 			QComboBox* deviceCombo = nullptr;
 			QSpinBox* channelsSpin = nullptr;
 			QComboBox* sampleTypeCombo = nullptr;
@@ -60,7 +63,7 @@ namespace flexasio_gui {
 		};
 
 		void BuildUi();
-		QGroupBox* BuildStreamGroup(const QString& title, StreamControls& controls);
+		AngularPanel* BuildStreamGroup(const QString& title, StreamControls& controls);
 		void RefreshDeviceLists();
 		void RefreshDeviceListForStream(StreamControls& controls, bool input);
 		void UpdateChannelsDefaultForDevice(StreamControls& controls);
@@ -73,12 +76,22 @@ namespace flexasio_gui {
 		void OnSaveClicked();
 		void OnResetClicked();
 
+		// Watches FlexASIO.toml for changes made outside this application (e.g. a text
+		// editor, or another instance of this GUI) and offers to reload when it happens.
+		void SetupConfigWatcher();
+		void OnConfigFileMaybeChanged();
+		void RearmConfigFileWatch();
+
 		QComboBox* backendCombo = nullptr;
 		QSlider* bufferSizeSlider = nullptr;
 		QSpinBox* bufferSizeSpin = nullptr;
 
 		StreamControls inputControls;
 		StreamControls outputControls;
+
+		QFileSystemWatcher* configWatcher = nullptr;
+		QTimer* configWatchDebounceTimer = nullptr;
+		bool suppressNextConfigWatchPrompt = false;
 	};
 
 }

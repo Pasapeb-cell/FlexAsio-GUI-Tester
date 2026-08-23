@@ -5,6 +5,7 @@
 #include <QTimer>
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 namespace flexasio_gui {
@@ -32,6 +33,8 @@ namespace flexasio_gui {
 		playbackPosition = 0;
 		totalCallbacks.store(0, std::memory_order_relaxed);
 		totalDropouts.store(0, std::memory_order_relaxed);
+		peakLeft.store(0, std::memory_order_relaxed);
+		peakRight.store(0, std::memory_order_relaxed);
 		lastPolledCallbacks = 0;
 		lastPolledDropouts = 0;
 
@@ -70,6 +73,8 @@ namespace flexasio_gui {
 			stream = nullptr;
 			throw std::runtime_error(std::string("Unable to start audio stream: ") + Pa_GetErrorText(startError));
 		}
+		const auto* streamInfo = Pa_GetStreamInfo(stream);
+		actualOutputLatencySeconds = streamInfo != nullptr ? streamInfo->outputLatency : 0.0;
 
 		startTime = std::chrono::steady_clock::now();
 		pollTimer->start();
@@ -94,6 +99,10 @@ namespace flexasio_gui {
 		stats.totalDropouts = dropouts;
 		stats.windowCallbacks = callbacks - lastPolledCallbacks;
 		stats.windowDropouts = dropouts - lastPolledDropouts;
+		stats.peakLeft = float(peakLeft.exchange(0, std::memory_order_relaxed)) / 1000.0f;
+		stats.peakRight = float(peakRight.exchange(0, std::memory_order_relaxed)) / 1000.0f;
+		stats.actualOutputLatencySeconds = actualOutputLatencySeconds;
+		stats.streamCpuLoadPercent = Pa_GetStreamCpuLoad(stream) * 100.0;
 		stats.elapsedSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - startTime).count();
 
 		lastPolledCallbacks = callbacks;
@@ -125,6 +134,14 @@ namespace flexasio_gui {
 		for (size_t i = 0; i < samplesNeeded; ++i) {
 			out[i] = signalBuffer[playbackPosition];
 			playbackPosition = (playbackPosition + 1) % signalBuffer.size();
+
+			const int scaledPeak = int(std::clamp(std::abs(out[i]), 0.0f, 1.0f) * 1000.0f);
+			// The MVP emits the same signal on each channel, but retain distinct meters
+			// so future multi-channel generators can report their real left/right peaks.
+			auto& peak = i % size_t(channels) == 0 ? peakLeft : peakRight;
+			int observed = peak.load(std::memory_order_relaxed);
+			while (observed < scaledPeak && !peak.compare_exchange_weak(
+				observed, scaledPeak, std::memory_order_relaxed, std::memory_order_relaxed)) {}
 		}
 		return paContinue;
 	}

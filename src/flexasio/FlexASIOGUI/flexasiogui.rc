@@ -1,0 +1,3 @@
+// Windows executable icon (shown in Explorer, the taskbar, and Alt-Tab).
+// Qt's window icon is set separately from the Qt resource in MainWindow.
+1 ICON "resources/app_icon.ico"

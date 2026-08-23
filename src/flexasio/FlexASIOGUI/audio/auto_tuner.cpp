@@ -23,7 +23,9 @@ namespace flexasio_gui {
 		candidates = kCommonSizes;
 		lo = 0;
 		hi = int(candidates.size()) - 1;
-		bestStableSize = candidates.back();
+		bestStableSize = 0;
+		foundStableSize = false;
+		lastOpenError.clear();
 		TestNextCandidate();
 	}
 
@@ -35,7 +37,10 @@ namespace flexasio_gui {
 	void AutoTuner::TestNextCandidate() {
 		if (lo > hi) {
 			engine.Stop();
-			emit finished(qint64(bestStableSize));
+			if (foundStableSize) emit finished(qint64(bestStableSize));
+			else emit failed(lastOpenError.isEmpty()
+				? "No candidate buffer size could be tested."
+				: "No candidate buffer size could be opened: " + lastOpenError);
 			return;
 		}
 
@@ -46,10 +51,11 @@ namespace flexasio_gui {
 		try {
 			engine.Start(config);
 		}
-		catch (const std::exception&) {
+		catch (const std::exception& exception) {
 			// This size failed to open at all (e.g. too small for the backend/device) -
 			// treat it the same as "unstable" and search towards larger sizes.
 			lo = mid + 1;
+			lastOpenError = QString::fromUtf8(exception.what());
 			TestNextCandidate();
 			return;
 		}
@@ -63,6 +69,7 @@ namespace flexasio_gui {
 		const int mid = (lo + hi) / 2;
 		if (stable) {
 			bestStableSize = candidates[size_t(mid)];
+			foundStableSize = true;
 			hi = mid - 1;
 		}
 		else {

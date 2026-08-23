@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <iomanip>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <variant>
@@ -30,6 +31,15 @@ namespace flexasio_gui {
 			return result;
 		}
 
+		// tinytoml keeps integer and floating-point literals distinct. FlexASIO reads
+		// suggestedLatencySeconds as a double, so serializing 0.0 as `0` makes an
+		// otherwise well-formed file fail configuration validation.
+		std::string FormatTomlFloat(double value) {
+			std::ostringstream result;
+			result << std::showpoint << std::setprecision(std::numeric_limits<double>::max_digits10) << value;
+			return result.str();
+		}
+
 		void WriteDevice(std::ostream& out, const flexasio::Config::Device& device) {
 			std::visit([&](const auto& value) {
 				using T = std::decay_t<decltype(value)>;
@@ -52,7 +62,7 @@ namespace flexasio_gui {
 			WriteDevice(out, stream.device);
 			if (stream.channels.has_value()) out << "channels = " << *stream.channels << "\n";
 			if (stream.sampleType.has_value()) out << "sampleType = " << QuoteTomlString(*stream.sampleType) << "\n";
-			if (stream.suggestedLatencySeconds.has_value()) out << "suggestedLatencySeconds = " << *stream.suggestedLatencySeconds << "\n";
+			if (stream.suggestedLatencySeconds.has_value()) out << "suggestedLatencySeconds = " << FormatTomlFloat(*stream.suggestedLatencySeconds) << "\n";
 			out << "wasapiExclusiveMode = " << (stream.wasapiExclusiveMode ? "true" : "false") << "\n";
 			out << "wasapiAutoConvert = " << (stream.wasapiAutoConvert ? "true" : "false") << "\n";
 			out << "wasapiExplicitSampleFormat = " << (stream.wasapiExplicitSampleFormat ? "true" : "false") << "\n";

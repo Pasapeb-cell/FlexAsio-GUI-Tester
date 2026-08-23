@@ -1,7 +1,10 @@
 #include "quality_indicator.h"
 
-#include <QFont>
+#include <QLinearGradient>
 #include <QPainter>
+#include <QRadialGradient>
+
+#include "../theme.h"
 
 namespace flexasio_gui {
 
@@ -13,7 +16,7 @@ namespace flexasio_gui {
 		update();
 	}
 
-	QSize QualityIndicator::sizeHint() const { return QSize(220, 48); }
+	QSize QualityIndicator::sizeHint() const { return QSize(300, 56); }
 
 	void QualityIndicator::paintEvent(QPaintEvent*) {
 		QPainter painter(this);
@@ -22,25 +25,53 @@ namespace flexasio_gui {
 		QColor color;
 		QString text;
 		switch (level) {
-		case QualityLevel::Green: color = QColor(0x2e, 0xa0, 0x43); text = "Stable"; break;
-		case QualityLevel::Yellow: color = QColor(0xe0, 0xa8, 0x00); text = "Marginal"; break;
-		case QualityLevel::Red: color = QColor(0xd0, 0x30, 0x30); text = "Unstable"; break;
+		case QualityLevel::Green:  color = theme::kOk;   text = "Stable"; break;
+		case QualityLevel::Yellow: color = theme::kWarn; text = "Marginal"; break;
+		case QualityLevel::Red:    color = theme::kBad;  text = "Unstable"; break;
 		case QualityLevel::Unknown:
-		default: color = QColor(0x80, 0x80, 0x80); text = "Not tested"; break;
+		default:                   color = theme::kIdle; text = "Not tested"; break;
 		}
 
-		const int diameter = qMin(height() - 8, 32);
-		const QRect circleRect(4, (height() - diameter) / 2, diameter, diameter);
-		painter.setPen(Qt::NoPen);
-		painter.setBrush(color);
-		painter.drawEllipse(circleRect);
+		const QRectF body = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+		const QPainterPath shape = theme::ChamferedRect(body, 12.0);
 
-		painter.setPen(palette().color(QPalette::WindowText));
-		QFont font = painter.font();
-		font.setBold(true);
-		painter.setFont(font);
-		painter.drawText(QRect(circleRect.right() + 12, 0, width() - circleRect.right() - 16, height()),
-			Qt::AlignVCenter | Qt::AlignLeft, text);
+		// Body tinted toward the verdict colour so the whole strip reads at a glance.
+		QLinearGradient fill(body.topLeft(), body.topRight());
+		QColor tint = color; tint.setAlphaF(0.20f);
+		QColor fade = color; fade.setAlphaF(0.02f);
+		painter.fillPath(shape, QBrush(theme::kField));
+		fill.setColorAt(0.0, tint);
+		fill.setColorAt(1.0, fade);
+		painter.fillPath(shape, fill);
+
+		QColor edge = color; edge.setAlphaF(0.65f);
+		painter.setPen(QPen(edge, 1));
+		painter.drawPath(shape);
+
+		// Lamp with a bloom halo.
+		const qreal lampR = 11.0;
+		const QPointF center(body.left() + 30, body.center().y());
+
+		QRadialGradient halo(center, lampR * 2.6);
+		QColor haloIn = color; haloIn.setAlphaF(0.55f);
+		QColor haloOut = color; haloOut.setAlphaF(0.0f);
+		halo.setColorAt(0.0, haloIn);
+		halo.setColorAt(1.0, haloOut);
+		painter.setPen(Qt::NoPen);
+		painter.setBrush(halo);
+		painter.drawEllipse(center, lampR * 2.6, lampR * 2.6);
+
+		painter.setBrush(color);
+		painter.drawEllipse(center, lampR, lampR);
+
+		QColor hi = color.lighter(165);
+		painter.setBrush(hi);
+		painter.drawEllipse(center + QPointF(-lampR * 0.28, -lampR * 0.30), lampR * 0.34, lampR * 0.34);
+
+		painter.setPen(color);
+		painter.setFont(theme::DisplayFont(14, /*bold=*/true, /*letterSpacingPercent=*/152));
+		painter.drawText(QRectF(center.x() + 30, body.top(), body.width() - center.x() - 22, body.height()),
+			Qt::AlignVCenter | Qt::AlignLeft, text.toUpper());
 	}
 
 }

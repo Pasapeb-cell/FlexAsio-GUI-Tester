@@ -62,6 +62,7 @@ The reason this fork exists.
   signal, raised inside PortAudio's own high-priority audio thread when the
   hardware needed samples that weren't ready
 - Shows a live **green / yellow / red** verdict, dropout count, and glitch rate
+- Shows callback-measured **stereo output peak meters** alongside the stability verdict
 - Lets you **drag the buffer size while audio is playing** and hear/see the effect
   within a couple hundred milliseconds
 - **Auto-Tune** binary-searches common buffer sizes (32 … 4096), testing each for a
@@ -74,11 +75,12 @@ that's already running will generally pick up the new buffer size on its own.
 ## Status
 
 Working and usable, built and smoke-tested on Windows 11 with MSVC 2022 and Qt 6.8.1.
+The GUI includes config-file change watching, a custom dark arcade-inspired theme, and
+an application icon. The build deploys the required Qt runtime files beside the executable.
 
-Not yet done: config-file change watching in the GUI, theming, an app icon, and a
-packaged installer. **There is no release build yet — you'll need to build from
-source** (see below). Input/recording testing isn't implemented; the tester is
-output-only, which covers the playback-crackling case that motivated this fork.
+Input/recording testing isn't implemented; the tester is output-only, which covers the
+playback-crackling case that motivated this fork. A packaged installer is also not yet
+provided; build from source using the instructions below.
 
 ## Building
 

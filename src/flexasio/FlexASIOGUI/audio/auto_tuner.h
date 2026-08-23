@@ -29,6 +29,7 @@ namespace flexasio_gui {
 	signals:
 		void progress(qint64 bufferSizeSamples, int candidateIndex, int candidateCount);
 		void finished(qint64 minimumStableBufferSize);
+		void failed(QString reason);
 
 	private slots:
 		void OnTestWindowElapsed();
@@ -44,6 +45,8 @@ namespace flexasio_gui {
 		int lo = 0;
 		int hi = 0;
 		int64_t bestStableSize = 0;
+		bool foundStableSize = false;
+		QString lastOpenError;
 
 		QTimer* windowTimer = nullptr;
 	};

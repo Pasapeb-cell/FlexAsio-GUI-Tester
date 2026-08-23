@@ -5,9 +5,12 @@
 
 #include "core/device_enumerator.h"
 #include "ui/main_window.h"
+#include "ui/theme.h"
 
 int main(int argc, char** argv) {
 	QApplication app(argc, argv);
+	app.setApplicationName("FlexASIO GUI Tester");
+	flexasio_gui::theme::Apply(app);
 
 	std::unique_ptr<flexasio_gui::PortAudioSession> portAudioSession;
 	try {

@@ -3,19 +3,23 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDoubleSpinBox>
-#include <QGroupBox>
+#include <QFile>
+#include <QFileSystemWatcher>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QMessageBox>
-#include <QPushButton>
 #include <QSlider>
 #include <QSpinBox>
+#include <QTimer>
 #include <QVBoxLayout>
 
 #include <variant>
 
 #include "../core/config_io.h"
 #include "../core/device_enumerator.h"
+#include "theme.h"
+#include "widgets/angular_button.h"
+#include "widgets/angular_panel.h"
 
 namespace flexasio_gui {
 
@@ -34,47 +38,58 @@ namespace flexasio_gui {
 	SettingsTab::SettingsTab(QWidget* parent) : QWidget(parent) {
 		BuildUi();
 		ReloadFromDisk();
+		SetupConfigWatcher();
 	}
 
 	void SettingsTab::BuildUi() {
+		setObjectName("TabPage");
 		auto* rootLayout = new QVBoxLayout(this);
+		rootLayout->setSpacing(12);
 
+		auto* driverPanel = new AngularPanel("Driver");
 		auto* topRow = new QHBoxLayout();
-		topRow->addWidget(new QLabel("Backend:"));
+		topRow->setSpacing(10);
+		topRow->addWidget(new QLabel("Backend"));
 		backendCombo = new QComboBox();
 		for (const auto& hostApi : GetHostApis())
 			backendCombo->addItem(QString::fromStdString(hostApi.name), hostApi.index);
 		topRow->addWidget(backendCombo, 1);
 
-		topRow->addWidget(new QLabel("Buffer size (samples):"));
+		topRow->addSpacing(16);
+		topRow->addWidget(new QLabel("Buffer size"));
 		bufferSizeSlider = new QSlider(Qt::Horizontal);
 		bufferSizeSlider->setRange(int(kMinBufferSize), int(kMaxBufferSize));
 		bufferSizeSpin = new QSpinBox();
 		bufferSizeSpin->setRange(int(kMinBufferSize), int(kMaxBufferSize));
 		bufferSizeSpin->setValue(256);
+		bufferSizeSpin->setSuffix(" smp");
 		topRow->addWidget(bufferSizeSlider, 2);
 		topRow->addWidget(bufferSizeSpin);
-		rootLayout->addLayout(topRow);
+		driverPanel->ContentLayout()->addLayout(topRow);
+		rootLayout->addWidget(driverPanel);
 
 		connect(bufferSizeSlider, &QSlider::valueChanged, bufferSizeSpin, &QSpinBox::setValue);
 		connect(bufferSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), bufferSizeSlider, &QSlider::setValue);
 		connect(bufferSizeSpin, QOverload<int>::of(&QSpinBox::valueChanged), this, &SettingsTab::configChanged);
 
 		auto* streamsRow = new QHBoxLayout();
+		streamsRow->setSpacing(12);
 		streamsRow->addWidget(BuildStreamGroup("Input", inputControls));
 		streamsRow->addWidget(BuildStreamGroup("Output", outputControls));
 		rootLayout->addLayout(streamsRow, 1);
 
 		auto* buttonsRow = new QHBoxLayout();
-		auto* saveButton = new QPushButton("Save to FlexASIO.toml");
-		auto* resetButton = new QPushButton("Reset Defaults");
+		buttonsRow->setSpacing(10);
+		auto* saveButton = new AngularButton("Save to FlexASIO.toml");
+		saveButton->SetEmphasis(AngularButton::Emphasis::Primary);
+		auto* resetButton = new AngularButton("Reset Defaults");
 		buttonsRow->addStretch(1);
 		buttonsRow->addWidget(resetButton);
 		buttonsRow->addWidget(saveButton);
 		rootLayout->addLayout(buttonsRow);
 
-		connect(saveButton, &QPushButton::clicked, this, &SettingsTab::OnSaveClicked);
-		connect(resetButton, &QPushButton::clicked, this, &SettingsTab::OnResetClicked);
+		connect(saveButton, &AngularButton::clicked, this, &SettingsTab::OnSaveClicked);
+		connect(resetButton, &AngularButton::clicked, this, &SettingsTab::OnResetClicked);
 
 		connect(backendCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
 			RefreshDeviceLists();
@@ -86,36 +101,41 @@ namespace flexasio_gui {
 		RefreshWasapiControlsVisibility();
 	}
 
-	QGroupBox* SettingsTab::BuildStreamGroup(const QString& title, StreamControls& controls) {
-		auto* group = new QGroupBox(title);
-		controls.group = group;
-		auto* layout = new QVBoxLayout(group);
+	AngularPanel* SettingsTab::BuildStreamGroup(const QString& title, StreamControls& controls) {
+		auto* panel = new AngularPanel(title);
+		// Output is the direction the tester exercises, so give it the magenta accent to
+		// distinguish it at a glance from input.
+		if (title == "Output") panel->SetAccent(theme::kAccent2);
+		controls.panel = panel;
+		auto* layout = panel->ContentLayout();
 
 		auto* deviceRow = new QHBoxLayout();
-		deviceRow->addWidget(new QLabel("Device:"));
+		deviceRow->addWidget(new QLabel("Device"));
 		controls.deviceCombo = new QComboBox();
 		deviceRow->addWidget(controls.deviceCombo, 1);
 		layout->addLayout(deviceRow);
 
 		auto* channelsRow = new QHBoxLayout();
-		channelsRow->addWidget(new QLabel("Channels:"));
+		channelsRow->addWidget(new QLabel("Channels"));
 		controls.channelsSpin = new QSpinBox();
 		controls.channelsSpin->setRange(1, 256);
 		controls.channelsSpin->setValue(2);
 		channelsRow->addWidget(controls.channelsSpin);
 
-		channelsRow->addWidget(new QLabel("Sample type:"));
+		channelsRow->addSpacing(12);
+		channelsRow->addWidget(new QLabel("Sample type"));
 		controls.sampleTypeCombo = new QComboBox();
 		controls.sampleTypeCombo->addItems({"Auto", "Float32", "Int32", "Int24", "Int16"});
-		channelsRow->addWidget(controls.sampleTypeCombo);
+		channelsRow->addWidget(controls.sampleTypeCombo, 1);
 		layout->addLayout(channelsRow);
 
 		auto* latencyRow = new QHBoxLayout();
-		latencyRow->addWidget(new QLabel("Suggested latency (s):"));
+		latencyRow->addWidget(new QLabel("Suggested latency"));
 		controls.suggestedLatencySpin = new QDoubleSpinBox();
 		controls.suggestedLatencySpin->setDecimals(3);
 		controls.suggestedLatencySpin->setSingleStep(0.001);
 		controls.suggestedLatencySpin->setRange(-0.001, 3600.0);
+		controls.suggestedLatencySpin->setSuffix(" s");
 		controls.suggestedLatencySpin->setSpecialValueText("Auto (3x buffer)");
 		latencyRow->addWidget(controls.suggestedLatencySpin, 1);
 		layout->addLayout(latencyRow);
@@ -129,6 +149,7 @@ namespace flexasio_gui {
 		wasapiRow->addWidget(controls.wasapiExclusiveCheck);
 		wasapiRow->addWidget(controls.wasapiAutoConvertCheck);
 		wasapiRow->addWidget(controls.wasapiExplicitFormatCheck);
+		wasapiRow->addStretch(1);
 		layout->addLayout(wasapiRow);
 
 		layout->addStretch(1);
@@ -145,7 +166,7 @@ namespace flexasio_gui {
 		connect(controls.wasapiAutoConvertCheck, &QCheckBox::toggled, this, &SettingsTab::configChanged);
 		connect(controls.wasapiExplicitFormatCheck, &QCheckBox::toggled, this, &SettingsTab::configChanged);
 
-		return group;
+		return panel;
 	}
 
 	void SettingsTab::RefreshDeviceLists() {
@@ -357,12 +378,59 @@ namespace flexasio_gui {
 
 	void SettingsTab::SaveCurrentConfig() {
 		try {
+			// Our own write is about to make FlexASIO.toml change out from under the
+			// watcher too - suppress the one prompt that would otherwise cause.
+			suppressNextConfigWatchPrompt = true;
 			SaveConfig(CurrentConfig());
+			RearmConfigFileWatch();
 			QMessageBox::information(this, "Saved", "Settings written to FlexASIO.toml.");
 		}
 		catch (const std::exception& exception) {
+			suppressNextConfigWatchPrompt = false;
 			QMessageBox::critical(this, "Unable to save FlexASIO.toml", exception.what());
 		}
+	}
+
+	void SettingsTab::SetupConfigWatcher() {
+		configWatcher = new QFileSystemWatcher(this);
+		RearmConfigFileWatch();
+		const auto dir = QString::fromStdWString(GetConfigPath().parent_path().wstring());
+		if (!dir.isEmpty()) configWatcher->addPath(dir);
+
+		configWatchDebounceTimer = new QTimer(this);
+		configWatchDebounceTimer->setSingleShot(true);
+		connect(configWatchDebounceTimer, &QTimer::timeout, this, &SettingsTab::OnConfigFileMaybeChanged);
+
+		// Debounce: some editors write a file by deleting it and recreating it, or by
+		// truncating then rewriting, which can otherwise fire multiple change events for a
+		// single logical save.
+		auto scheduleCheck = [this](const QString&) { configWatchDebounceTimer->start(300); };
+		connect(configWatcher, &QFileSystemWatcher::fileChanged, this, scheduleCheck);
+		connect(configWatcher, &QFileSystemWatcher::directoryChanged, this, scheduleCheck);
+	}
+
+	void SettingsTab::RearmConfigFileWatch() {
+		const auto filePath = QString::fromStdWString(GetConfigPath().wstring());
+		if (QFile::exists(filePath) && !configWatcher->files().contains(filePath))
+			configWatcher->addPath(filePath);
+	}
+
+	void SettingsTab::OnConfigFileMaybeChanged() {
+		// The file may have been deleted and recreated (dropping it from the watcher's
+		// file list, which only the directory watch would have caught) - re-arm before
+		// deciding whether to prompt.
+		RearmConfigFileWatch();
+
+		if (suppressNextConfigWatchPrompt) {
+			suppressNextConfigWatchPrompt = false;
+			return;
+		}
+
+		const auto reply = QMessageBox::question(this, "FlexASIO.toml changed",
+			"FlexASIO.toml was modified outside this application. Reload it now?\n\n"
+			"(Any unsaved changes in this window will be lost.)",
+			QMessageBox::Yes | QMessageBox::No);
+		if (reply == QMessageBox::Yes) ReloadFromDisk();
 	}
 
 	void SettingsTab::OnSaveClicked() { SaveCurrentConfig(); }

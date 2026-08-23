@@ -1,6 +1,7 @@
 find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets)
 
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 add_executable(FlexASIOGUI WIN32
     main.cpp
@@ -10,12 +11,18 @@ add_executable(FlexASIOGUI WIN32
     audio/signal_generator.cpp
     audio/engine.cpp
     audio/auto_tuner.cpp
+    ui/theme.cpp
     ui/main_window.cpp
     ui/settings_tab.cpp
     ui/latency_tab.cpp
     ui/tester_tab.cpp
     ui/widgets/quality_indicator.cpp
+    ui/widgets/level_meter.cpp
     ui/widgets/latency_pipeline.cpp
+    ui/widgets/angular_panel.cpp
+    ui/widgets/angular_button.cpp
+    resources/resources.qrc
+    flexasiogui.rc
 )
 target_compile_definitions(FlexASIOGUI PRIVATE PROJECT_DESCRIPTION="FlexASIO GUI Tester")
 # The parent CMakeLists.txt sets /WX /W4 /analyze for the whole flexasio tree, tuned for

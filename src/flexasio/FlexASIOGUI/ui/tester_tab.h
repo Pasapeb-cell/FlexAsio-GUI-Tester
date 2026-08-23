@@ -7,15 +7,16 @@
 
 class QComboBox;
 class QLabel;
-class QPushButton;
 class QSlider;
 class QSpinBox;
 class QTimer;
 
 namespace flexasio_gui {
 
+	class AngularButton;
 	class SettingsTab;
 	class QualityIndicator;
+	class LevelMeter;
 
 	// The audio tester: plays a test signal through the device/backend currently selected
 	// in SettingsTab, at an independently adjustable buffer size, and shows live dropout
@@ -41,6 +42,7 @@ namespace flexasio_gui {
 		void OnStateChanged(EngineState state);
 		void OnAutoTuneProgress(qint64 bufferSize, int index, int count);
 		void OnAutoTuneFinished(qint64 minimumStableBufferSize);
+		void OnAutoTuneFailed(const QString& reason);
 		void ShowError(const QString& message);
 
 		SettingsTab& settingsTab;
@@ -54,15 +56,17 @@ namespace flexasio_gui {
 		QSpinBox* bufferSizeSpin = nullptr;
 		QLabel* bufferSizeMsLabel = nullptr;
 
-		QPushButton* playButton = nullptr;
-		QPushButton* stopButton = nullptr;
-		QPushButton* autoTuneButton = nullptr;
-		QPushButton* applyButton = nullptr;
+		AngularButton* playButton = nullptr;
+		AngularButton* stopButton = nullptr;
+		AngularButton* autoTuneButton = nullptr;
+		AngularButton* applyButton = nullptr;
 
 		QualityIndicator* qualityIndicator = nullptr;
+		LevelMeter* levelMeter = nullptr;
 		QLabel* dropoutsLabel = nullptr;
 		QLabel* glitchRateLabel = nullptr;
 		QLabel* elapsedLabel = nullptr;
+		QLabel* streamInfoLabel = nullptr;
 		QLabel* autoTuneStatusLabel = nullptr;
 
 		QTimer* restartDebounceTimer = nullptr;
