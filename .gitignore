@@ -5,6 +5,8 @@ out/
 
 # CMake build output
 build/
+local-release/
+.tools/
 
 # Claude Code harness-local files
 .claude/
