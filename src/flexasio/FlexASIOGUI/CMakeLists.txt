@@ -1,4 +1,10 @@
-find_package(Qt6 6.11.2 CONFIG REQUIRED COMPONENTS Widgets)
+option(FLEXASIOGUI_ALLOW_UNSUPPORTED_QT "Allow a local development build with an older Qt runtime" OFF)
+if(FLEXASIOGUI_ALLOW_UNSUPPORTED_QT)
+    message(WARNING "Building with an unsupported Qt runtime. This build must not be distributed as a release.")
+    find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets)
+else()
+    find_package(Qt6 6.11.2 CONFIG REQUIRED COMPONENTS Widgets)
+endif()
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
