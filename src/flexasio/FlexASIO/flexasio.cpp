@@ -21,6 +21,7 @@
 
 #include "control_panel.h"
 #include "log.h"
+#include "../FlexASIOUtil/sample_format.h"
 
 namespace flexasio {
 
@@ -271,23 +272,11 @@ namespace flexasio {
 	}
 
 	FlexASIO::SampleType FlexASIO::SelectSampleType(const PaHostApiTypeId hostApiTypeId, const Device& device, const Config::Stream& streamConfig) {
-		if (streamConfig.sampleType.has_value()) {
-			Log() << "Selecting sample type from configuration";
-			return ParseSampleType(*streamConfig.sampleType);
-		}
-		if (hostApiTypeId == paWASAPI && streamConfig.wasapiExclusiveMode) {
-			try {
-				Log() << "WASAPI Exclusive mode detected, selecting sample type from WASAPI device default format";
-				const auto deviceFormat = GetWasapiDeviceDefaultFormat(device.index);
-				Log() << "WASAPI device default format: " << DescribeWaveFormat(deviceFormat);
-				return WaveFormatToSampleType(deviceFormat);
-			}
-			catch (const std::exception& exception) {
-				Log() << "Unable to select sample type from WASAPI device default format: " << exception.what();
-			}
-		}
-		Log() << "Selecting default sample type";
-		return float32;
+		const auto portAudioFormat = ResolvePortAudioSampleFormat(
+			hostApiTypeId, device.index, streamConfig.sampleType, streamConfig.wasapiExclusiveMode);
+		for (const auto& [name, sampleType] : sampleTypes)
+			if (sampleType.pa == portAudioFormat) return sampleType;
+		throw std::runtime_error("Shared sample-format resolver returned an unsupported PortAudio format");
 	}
 
 	DWORD FlexASIO::SelectChannelMask(const PaHostApiTypeId hostApiTypeId, const Device& device, const Config::Stream& streamConfig) {

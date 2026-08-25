@@ -18,11 +18,13 @@ and finding the lowest buffer size that doesn't crackle means repeating this loo
 4. Play something and listen for crackling
 5. Guess a new buffer size, go to step 1
 
-This fork collapses that loop into a single window. The tester plays audio through
-**PortAudio** — the same library FlexASIO itself uses — with the same backend,
-device, and buffer size you've configured. So a buffer size that tests clean here
-behaves the same way when FlexASIO uses it, and you never have to open your DAW to
-find out.
+This fork collapses that loop into a single window. The tester opens the same
+PortAudio stream shape FlexASIO uses: backend, devices, duplex state, channels,
+sample formats, buffer size, latency hints, and WASAPI flags. A clean result means
+the callback and stream remained stable for that test; it is **not** proof of
+audible or end-to-end hardware stability. Loopback capture is planned as the
+future end-to-end verification layer, so still confirm a new setting in your real
+DAW/project.
 
 ## What's added
 

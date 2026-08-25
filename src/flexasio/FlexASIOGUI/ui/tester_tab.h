@@ -44,6 +44,7 @@ namespace flexasio_gui {
 		void OnAutoTuneFinished(qint64 minimumStableBufferSize);
 		void OnAutoTuneFailed(const QString& reason);
 		void ShowError(const QString& message);
+		void SetVerdict(TestVerdict verdict);
 
 		SettingsTab& settingsTab;
 		AudioEngine engine;
@@ -51,6 +52,8 @@ namespace flexasio_gui {
 
 		QComboBox* signalCombo = nullptr;
 		QComboBox* sampleRateCombo = nullptr;
+		QComboBox* stressCombo = nullptr;
+		QComboBox* autoTuneModeCombo = nullptr;
 		QSlider* volumeSlider = nullptr;
 		QSlider* bufferSizeSlider = nullptr;
 		QSpinBox* bufferSizeSpin = nullptr;
@@ -67,10 +70,13 @@ namespace flexasio_gui {
 		QLabel* glitchRateLabel = nullptr;
 		QLabel* elapsedLabel = nullptr;
 		QLabel* streamInfoLabel = nullptr;
+		QLabel* callbackInfoLabel = nullptr;
+		QLabel* verdictLabel = nullptr;
 		QLabel* autoTuneStatusLabel = nullptr;
 
 		QTimer* restartDebounceTimer = nullptr;
 		bool autoTuneRunning = false;
+		TestVerdict verdict = TestVerdict::NotTested;
 	};
 
 }

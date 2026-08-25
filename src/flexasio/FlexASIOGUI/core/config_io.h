@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 
 #include "../../FlexASIO/config.h"
 
@@ -14,9 +15,14 @@ namespace flexasio_gui {
 	// default-constructed Config if the file does not exist yet.
 	flexasio::Config LoadConfig();
 
-	// Serializes config to FlexASIO's expected TOML format and writes it to GetConfigPath(),
-	// overwriting any existing file. tinytoml (FlexASIO's TOML library) only supports
-	// reading, so this covers exactly the fields config.cpp knows how to parse.
+	// These are intentionally separate for deterministic unit tests and to ensure
+	// persistence never writes unchecked generated TOML to the live configuration.
+	std::string SerializeConfig(const flexasio::Config& config);
+	void ValidateConfig(const flexasio::Config& config);
+
+	// Serializes config to FlexASIO's expected TOML format, validates it through
+	// FlexASIO's own loader, then atomically replaces the live configuration.
 	void SaveConfig(const flexasio::Config& config);
+	void SaveConfigToPath(const flexasio::Config& config, const std::filesystem::path& path);
 
 }

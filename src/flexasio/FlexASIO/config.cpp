@@ -2,6 +2,8 @@
 
 #include "config.h"
 
+#include <cmath>
+
 #include <dechamps_cpputil/exception.h>
 #include <toml/toml.h>
 
@@ -17,6 +19,12 @@ namespace flexasio {
 
 		toml::Value LoadConfigToml(const std::filesystem::path& path) {
 			Log() << "Attempting to load configuration file: " << path;
+			std::error_code sizeError;
+			if (std::filesystem::exists(path, sizeError) && !sizeError) {
+				const auto size = std::filesystem::file_size(path, sizeError);
+				if (sizeError) throw std::runtime_error("Unable to inspect configuration file size");
+				if (size > 1024 * 1024) throw std::runtime_error("configuration file exceeds the 1 MiB safety limit");
+			}
 
 			std::ifstream stream;
 			stream.exceptions(stream.badbit | stream.failbit);
@@ -74,16 +82,20 @@ namespace flexasio {
 		}
 
 		void ValidateChannelCount(const int& channelCount) {
-			if (channelCount <= 0) throw std::runtime_error("channel count must be strictly positive - to disable a stream direction, set the 'device' option to the empty string \"\" instead");
+			if (channelCount <= 0 || channelCount > 256) throw std::runtime_error("channel count must be between 1 and 256 - to disable a stream direction, set the 'device' option to the empty string \"\" instead");
 		}
 
 		void ValidateSuggestedLatency(const double& suggestedLatencySeconds) {
-			if (!(suggestedLatencySeconds >= 0 && suggestedLatencySeconds <= 3600)) throw std::runtime_error("suggested latency must be between 0 and 3600 seconds");
+			if (!std::isfinite(suggestedLatencySeconds) || !(suggestedLatencySeconds >= 0 && suggestedLatencySeconds <= 3600)) throw std::runtime_error("suggested latency must be a finite value between 0 and 3600 seconds");
 		}
 
 		void ValidateBufferSize(const int64_t& bufferSizeSamples) {
-			if (bufferSizeSamples <= 0) throw std::runtime_error("buffer size must be strictly positive");
-			if (bufferSizeSamples >= (std::numeric_limits<long>::max)()) throw std::runtime_error("buffer size is too large");
+			if (bufferSizeSamples < 8 || bufferSizeSamples > 1024) throw std::runtime_error("buffer size must be between 8 and 1024 samples");
+		}
+
+		void ValidateSampleType(const std::string& sampleType) {
+			if (sampleType != "Float32" && sampleType != "Int32" && sampleType != "Int24" && sampleType != "Int16")
+				throw std::runtime_error("sample type must be Float32, Int32, Int24, or Int16");
 		}
 
 		void SetStream(const toml::Table& table, Config::Stream& stream) {
@@ -104,7 +116,7 @@ namespace flexasio {
 			});
 
 			SetOption(table, "channels", stream.channels, ValidateChannelCount);
-			SetOption(table, "sampleType", stream.sampleType);
+			SetOption(table, "sampleType", stream.sampleType, ValidateSampleType);
 			SetOption(table, "suggestedLatencySeconds", stream.suggestedLatencySeconds, ValidateSuggestedLatency);
 			SetOption(table, "wasapiExclusiveMode", stream.wasapiExclusiveMode);
 			SetOption(table, "wasapiAutoConvert", stream.wasapiAutoConvert);
@@ -162,6 +174,10 @@ namespace flexasio {
 			OVERLAPPED overlapped = { 0 };
 		};
 
+	}
+
+	Config LoadConfigFile(const std::filesystem::path& path) {
+		return LoadConfig(path);
 	}
 
 	ConfigLoader::Watcher::Watcher(const ConfigLoader& configLoader, std::function<void()> onConfigChange) :
@@ -371,14 +387,14 @@ namespace flexasio {
 
 	ConfigLoader::ConfigLoader() :
 		configDirectory(GetUserDirectory()),
-		initialConfig(LoadConfig(configDirectory / configFileName)) {}
+		initialConfig(LoadConfigFile(configDirectory / configFileName)) {}
 
 	void ConfigLoader::Watcher::OnConfigFileEvent() {
 		Log() << "Handling config file event";
 
 		Config newConfig;
 		try {
-			newConfig = LoadConfig(configLoader.configDirectory / configFileName);
+			newConfig = LoadConfigFile(configLoader.configDirectory / configFileName);
 		}
 		catch (const std::exception& exception) {
 			Log() << "Unable to load config, ignoring event: " << ::dechamps_cpputil::GetNestedExceptionMessage(exception);

@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 #include "signal_generator.h"
@@ -16,6 +17,9 @@ class QTimer;
 namespace flexasio_gui {
 
 	enum class EngineState { Stopped, Playing };
+	// This is intentionally a callback/stream verdict, not an audible or
+	// end-to-end hardware verdict. Loopback capture is the planned future layer.
+	enum class TestVerdict { NotTested, CallbackStable, HeadroomLimited, UnderflowDetected, OpenFailed };
 
 	struct EngineStats {
 		uint64_t totalCallbacks = 0;
@@ -24,20 +28,34 @@ namespace flexasio_gui {
 		uint64_t windowDropouts = 0;
 		float peakLeft = 0.0f;
 		float peakRight = 0.0f;
+		double actualInputLatencySeconds = 0.0;
 		double actualOutputLatencySeconds = 0.0;
 		double streamCpuLoadPercent = 0.0;
+		double averageCallbackLoadPercent = 0.0;
+		double worstCallbackLoadPercent = 0.0;
+		double worstCallbackJitterMilliseconds = 0.0;
+		uint64_t totalDeadlineWarnings = 0;
 		double elapsedSeconds = 0;
 	};
 
-	struct TestConfig {
+	struct TestStreamConfig {
 		int deviceIndex = -1;
 		int channels = 2;
-		double sampleRate = 48000;
-		int64_t bufferSizeSamples = 256;
+		PaSampleFormat sampleFormat = paFloat32;
 		double suggestedLatencySeconds = 0.0;
 		bool wasapiExclusive = false;
+		bool wasapiAutoConvert = true;
+		bool wasapiExplicitSampleFormat = true;
+	};
+
+	struct TestConfig {
+		std::optional<TestStreamConfig> input;
+		TestStreamConfig output;
+		double sampleRate = 48000;
+		int64_t bufferSizeSamples = 256;
 		SignalType signal = SignalType::Sine440;
 		double volume = 0.5;
+		int stressPercent = 0;
 	};
 
 	// Plays a test signal through a PortAudio output stream and detects dropouts via
@@ -62,6 +80,7 @@ namespace flexasio_gui {
 		void Stop();
 		bool IsPlaying() const { return stream != nullptr; }
 		uint64_t TotalDropouts() const { return totalDropouts.load(std::memory_order_relaxed); }
+		uint64_t TotalDeadlineWarnings() const { return totalDeadlineWarnings.load(std::memory_order_relaxed); }
 
 	signals:
 		void statsUpdated(flexasio_gui::EngineStats stats);
@@ -78,11 +97,17 @@ namespace flexasio_gui {
 			PaStreamCallbackFlags statusFlags,
 			void* userData);
 		int RenderCallback(void* output, unsigned long frameCount, PaStreamCallbackFlags statusFlags);
+		float NextSignalSample(int channel);
+		void WriteOutputSample(void* output, unsigned long frame, int channel, float value) const;
 
 		PaStream* stream = nullptr;
 		std::vector<float> signalBuffer;
 		size_t playbackPosition = 0;
-		int channels = 2;
+		int outputChannels = 2;
+		PaSampleFormat outputSampleFormat = paFloat32;
+		double sampleRate = 48000.0;
+		int stressPercent = 0;
+		double stressAccumulator = 0.61803398875;
 
 		std::atomic<uint64_t> totalCallbacks{0};
 		std::atomic<uint64_t> totalDropouts{0};
@@ -90,10 +115,17 @@ namespace flexasio_gui {
 		// synchronize floating point state with the GUI thread.
 		std::atomic<int> peakLeft{0};
 		std::atomic<int> peakRight{0};
+		std::atomic<uint64_t> totalDeadlineWarnings{0};
+		std::atomic<uint64_t> callbackWorkMicroseconds{0};
+		std::atomic<uint64_t> callbackBudgetMicroseconds{0};
+		std::atomic<uint64_t> worstCallbackLoadHundredths{0};
+		std::atomic<uint64_t> worstCallbackJitterMicroseconds{0};
+		std::atomic<int64_t> lastCallbackStartTick{0};
 
 		uint64_t lastPolledCallbacks = 0;
 		uint64_t lastPolledDropouts = 0;
 		std::chrono::steady_clock::time_point startTime;
+		double actualInputLatencySeconds = 0.0;
 		double actualOutputLatencySeconds = 0.0;
 
 		QTimer* pollTimer = nullptr;

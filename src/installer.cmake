@@ -7,10 +7,13 @@ find_package(InnoSetup MODULE REQUIRED)
 find_package(Git MODULE REQUIRED)
 set(DECHAMPS_CMAKEUTILS_GIT_DIR "${CMAKE_CURRENT_LIST_DIR}/flexasio")
 include(version/version)
-string(REGEX REPLACE "^flexasio-" "" FLEXASIO_VERSION "${DECHAMPS_CMAKEUTILS_GIT_DESCRIPTION_DIRTY}")
+if(NOT DEFINED DISTRIBUTION_VERSION)
+    set(DISTRIBUTION_VERSION "0.1.0")
+endif()
+set(FLEXASIO_VERSION "${DISTRIBUTION_VERSION}")
 
 configure_file("${CMAKE_CURRENT_LIST_DIR}/installer.in.iss" "${CMAKE_CURRENT_LIST_DIR}/out/installer.iss" @ONLY)
 include(execute_process_or_die)
 execute_process_or_die(
-    COMMAND "${InnoSetup_iscc_EXECUTABLE}" out/installer.iss /Oout/installer /FFlexASIO-${FLEXASIO_VERSION}
+    COMMAND "${InnoSetup_iscc_EXECUTABLE}" out/installer.iss /Oout/installer /FFlexASIO-GUI-Tester-${FLEXASIO_VERSION}-Setup
 )

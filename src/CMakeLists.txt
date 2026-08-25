@@ -2,6 +2,7 @@
 
 cmake_minimum_required(VERSION 3.11)
 project(flexasio DESCRIPTION "FlexASIO Universal ASIO Driver Superbuild")
+option(FLEXASIOGUI_BUILD "Build the x64 FlexASIO GUI Tester" ON)
 include(ExternalProject)
 set(INTERNAL_INSTALL_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/install")
 set(CMAKE_ARGS
@@ -113,7 +114,9 @@ ExternalProject_Add(
     INSTALL_DIR "${INTERNAL_INSTALL_PREFIX}"
     # FlexASIOGUI needs Qt6, which is a prebuilt (not vendored/superbuilt) dependency -
     # point CMake's find_package(Qt6) at it via CMAKE_PREFIX_PATH.
-    CMAKE_ARGS ${CMAKE_ARGS} "-DCMAKE_PREFIX_PATH=$ENV{FLEXASIOGUI_QT_DIR}"
+    CMAKE_ARGS ${CMAKE_ARGS}
+        "-DFLEXASIOGUI_BUILD=$<IF:$<EQUAL:${CMAKE_SIZEOF_VOID_P},8>,${FLEXASIOGUI_BUILD},OFF>"
+        "-DCMAKE_PREFIX_PATH=$ENV{FLEXASIOGUI_QT_DIR}"
     DEPENDS tinytoml portaudio dechamps_cpputil dechamps_cpplog dechamps_ASIOUtil ASIOTest
 )
 

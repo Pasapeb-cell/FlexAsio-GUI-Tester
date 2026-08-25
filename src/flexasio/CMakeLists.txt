@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.11)
 project(FlexASIO DESCRIPTION "FlexASIO Universal ASIO Driver")
 
+option(FLEXASIOGUI_BUILD "Build the x64 FlexASIO GUI Tester" ON)
+
 if(CMAKE_SIZEOF_VOID_P EQUAL 4)
 	set(FLEXASIO_PLATFORM x86)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -42,4 +44,6 @@ add_subdirectory(FlexASIOUtil EXCLUDE_FROM_ALL)
 add_subdirectory(FlexASIO)
 add_subdirectory(FlexASIOTest)
 add_subdirectory(PortAudioDevices)
-add_subdirectory(FlexASIOGUI)
+if(FLEXASIOGUI_BUILD)
+	add_subdirectory(FlexASIOGUI)
+endif()

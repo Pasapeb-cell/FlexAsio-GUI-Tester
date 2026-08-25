@@ -11,6 +11,7 @@
 class QTimer;
 
 namespace flexasio_gui {
+	enum class AutoTuneMode { Quick, Thorough };
 
 	// Binary-searches through a list of common ASIO buffer sizes to find the smallest one
 	// that produces zero output-underflow dropouts over a fixed test window. Drives the
@@ -23,7 +24,7 @@ namespace flexasio_gui {
 	public:
 		explicit AutoTuner(AudioEngine& engine, QObject* parent = nullptr);
 
-		void Start(TestConfig baseConfig, int testDurationMs = 5000);
+		void Start(TestConfig baseConfig, AutoTuneMode mode = AutoTuneMode::Thorough);
 		void Cancel();
 
 	signals:
@@ -36,10 +37,15 @@ namespace flexasio_gui {
 
 	private:
 		void TestNextCandidate();
+		void TestValidationCandidate(int candidateIndex);
+		void FinishValidation(bool stable);
 
 		AudioEngine& engine;
 		TestConfig config;
-		int testDurationMs = 5000;
+		int testDurationMs = 10'000;
+		AutoTuneMode mode = AutoTuneMode::Thorough;
+		enum class Phase { Search, ValidateBest, ValidateSmaller } phase = Phase::Search;
+		int validationIndex = -1;
 
 		std::vector<int64_t> candidates;
 		int lo = 0;

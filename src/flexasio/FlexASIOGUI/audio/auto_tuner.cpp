@@ -7,7 +7,7 @@ namespace flexasio_gui {
 	namespace {
 		const std::vector<int64_t> kCommonSizes = {
 			32, 48, 64, 96, 128, 144, 160, 192, 240, 256,
-			320, 384, 448, 480, 512, 768, 1024, 2048, 4096
+			320, 384, 448, 480, 512, 768, 1024
 		};
 	}
 
@@ -17,9 +17,12 @@ namespace flexasio_gui {
 		connect(windowTimer, &QTimer::timeout, this, &AutoTuner::OnTestWindowElapsed);
 	}
 
-	void AutoTuner::Start(TestConfig baseConfig, int testDurationMs_) {
+	void AutoTuner::Start(TestConfig baseConfig, AutoTuneMode newMode) {
 		config = std::move(baseConfig);
-		testDurationMs = testDurationMs_;
+		mode = newMode;
+		testDurationMs = mode == AutoTuneMode::Quick ? 5'000 : 10'000;
+		phase = Phase::Search;
+		validationIndex = -1;
 		candidates = kCommonSizes;
 		lo = 0;
 		hi = int(candidates.size()) - 1;
@@ -36,6 +39,11 @@ namespace flexasio_gui {
 
 	void AutoTuner::TestNextCandidate() {
 		if (lo > hi) {
+			if (foundStableSize && mode == AutoTuneMode::Thorough) {
+				phase = Phase::ValidateBest;
+				for (int i = 0; i < int(candidates.size()); ++i)
+					if (candidates[size_t(i)] == bestStableSize) { TestValidationCandidate(i); return; }
+			}
 			engine.Stop();
 			if (foundStableSize) emit finished(qint64(bestStableSize));
 			else emit failed(lastOpenError.isEmpty()
@@ -62,9 +70,35 @@ namespace flexasio_gui {
 		windowTimer->start(testDurationMs);
 	}
 
-	void AutoTuner::OnTestWindowElapsed() {
-		const bool stable = engine.TotalDropouts() == 0;
+	void AutoTuner::TestValidationCandidate(int candidateIndex) {
+		validationIndex = candidateIndex;
+		config.bufferSizeSamples = candidates[size_t(candidateIndex)];
+		emit progress(qint64(config.bufferSizeSamples), candidateIndex, int(candidates.size()));
+		try {
+			engine.Start(config);
+		}
+		catch (const std::exception& exception) {
+			lastOpenError = QString::fromUtf8(exception.what());
+			FinishValidation(false);
+			return;
+		}
+		windowTimer->start(60'000);
+	}
+
+	void AutoTuner::FinishValidation(bool stable) {
+		if (phase == Phase::ValidateBest) {
+			if (!stable) { engine.Stop(); emit failed("The selected buffer size failed 60-second validation."); return; }
+			if (validationIndex > 0) { phase = Phase::ValidateSmaller; TestValidationCandidate(validationIndex - 1); return; }
+			engine.Stop(); emit finished(qint64(bestStableSize)); return;
+		}
 		engine.Stop();
+		emit finished(qint64(stable ? candidates[size_t(validationIndex)] : bestStableSize));
+	}
+
+	void AutoTuner::OnTestWindowElapsed() {
+		const bool stable = engine.TotalDropouts() == 0 && engine.TotalDeadlineWarnings() == 0;
+		engine.Stop();
+		if (phase != Phase::Search) { FinishValidation(stable); return; }
 
 		const int mid = (lo + hi) / 2;
 		if (stable) {

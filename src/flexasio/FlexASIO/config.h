@@ -73,6 +73,11 @@ namespace flexasio {
 		}
 	};
 
+	// Parses and validates a specific configuration file using the same loader as
+	// the driver. This is intentionally public so configuration tools can validate
+	// generated content before atomically replacing the live FlexASIO.toml.
+	Config LoadConfigFile(const std::filesystem::path& path);
+
 	class ConfigLoader {
 	public:
 		ConfigLoader();

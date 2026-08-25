@@ -9,28 +9,41 @@ jobs:
           - msvc_config: x64-Release
             msvc_arch: amd64
             build_type: RelWithDebInfo
+            gui: ON
           - msvc_config: x86-Release
             msvc_arch: amd64_x86
             build_type: RelWithDebInfo
+            gui: OFF
           - msvc_config: x64-Debug
             msvc_arch: amd64
             build_type: Debug
+            gui: ON
           - msvc_config: x86-Debug
             msvc_arch: amd64_x86
             build_type: Debug
+            gui: OFF
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           # Required for version stamping (`git describe`) to work.
           fetch-depth: 0
-      - uses: ilammy/msvc-dev-cmd@v1
+      - uses: ilammy/msvc-dev-cmd@a102174a2b586eec2ea151a69e6fd14404a8ce7c # v1.13.0
         with:
           arch: ${{ matrix.msvc_arch }}
-      - run: cmake -S src -B src/out/build/${{ matrix.msvc_config }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DCMAKE_INSTALL_PREFIX:PATH=${{ github.workspace }}/src/out/install/${{ matrix.msvc_config }}
+      - if: matrix.gui == 'ON'
+        uses: jurplel/install-qt-action@d325aaf2a8baeeda41ad0b5d39f84a6af9bcf005 # v4.3.0
+        with:
+          version: 6.11.2
+          arch: win64_msvc2022_64
+      - run: cmake -S src -B src/out/build/${{ matrix.msvc_config }} -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DFLEXASIOGUI_BUILD=${{ matrix.gui }} -DCMAKE_INSTALL_PREFIX:PATH=${{ github.workspace }}/src/out/install/${{ matrix.msvc_config }}
+        env:
+          FLEXASIOGUI_QT_DIR: ${{ env.Qt6_DIR }}
       - run: cmake --build src/out/build/${{ matrix.msvc_config }}
+      - if: matrix.gui == 'ON'
+        run: ctest --test-dir src/out/build/${{ matrix.msvc_config }}/FlexASIO-prefix/src/FlexASIO-build -C ${{ matrix.build_type }} --output-on-failure
       - run: cmake --install src/out/build/${{ matrix.msvc_config }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: FlexASIO-${{ matrix.msvc_config }}
           path: src/out/install/${{ matrix.msvc_config }}/
@@ -66,22 +79,23 @@ jobs:
     runs-on: windows-latest
     needs: build
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           submodules: recursive
           # Required for version stamping (`git describe`) to work.
           fetch-depth: 0
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: FlexASIO-x64-Release
           path: src/out/install/x64-Release
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: FlexASIO-x86-Release
           path: src/out/install/x86-Release
+      - run: Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile src/out/install/x64-Release/vc_redist.x64.exe
       - run: cmake -P installer.cmake
         working-directory: src
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: FlexASIO-installer
           path: src/out/installer/*
@@ -91,13 +105,13 @@ jobs:
       permissions:
         id-token: write
       steps:
-        - uses: actions/download-artifact@v4
+        - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
           with:
             name: FlexASIO-installer
-        - uses: sigstore/gh-action-sigstore-python@v2.1.0
+        - uses: sigstore/gh-action-sigstore-python@1a402ed919f6cb88b9bafb523fb65508c442514b # v2.1.0
           with:
             inputs: "*"
-        - uses: actions/upload-artifact@v4
+        - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
           with:
             name: sigstore
             path: "*.sigstore"
@@ -111,13 +125,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: FlexASIO-installer
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: sigstore
-      - uses: softprops/action-gh-release@v1
+      - uses: softprops/action-gh-release@6cbd405e2c4e67a21c47fa9e383d020e4e28b836 # v2.3.3
         with:
           draft: true
           files: "*"

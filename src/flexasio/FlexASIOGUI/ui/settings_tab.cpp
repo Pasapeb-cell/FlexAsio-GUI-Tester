@@ -2,6 +2,7 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QCoreApplication>
 #include <QDoubleSpinBox>
 #include <QFile>
 #include <QFileSystemWatcher>
@@ -32,13 +33,15 @@ namespace flexasio_gui {
 		constexpr int kRegexPatternRole = Qt::UserRole + 1;
 
 		constexpr int64_t kMinBufferSize = 8;
-		constexpr int64_t kMaxBufferSize = 8192;
+		constexpr int64_t kMaxBufferSize = 1024;
 	}
 
 	SettingsTab::SettingsTab(QWidget* parent) : QWidget(parent) {
 		BuildUi();
-		ReloadFromDisk();
-		SetupConfigWatcher();
+		if (!QCoreApplication::instance()->property("flexasioGuiSmokeTest").toBool()) {
+			ReloadFromDisk();
+			SetupConfigWatcher();
+		}
 	}
 
 	void SettingsTab::BuildUi() {
@@ -97,7 +100,13 @@ namespace flexasio_gui {
 			emit configChanged();
 		});
 
-		RefreshDeviceLists();
+		if (QCoreApplication::instance()->property("flexasioGuiSmokeTest").toBool()) {
+			for (auto* controls : {&inputControls, &outputControls}) {
+				controls->deviceCombo->addItem("Default Device", kDeviceDataDefault);
+				controls->deviceCombo->addItem("Disabled", kDeviceDataDisabled);
+			}
+		}
+		else RefreshDeviceLists();
 		RefreshWasapiControlsVisibility();
 	}
 

@@ -1,4 +1,4 @@
-find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets)
+find_package(Qt6 6.11.2 CONFIG REQUIRED COMPONENTS Widgets)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -28,11 +28,13 @@ target_compile_definitions(FlexASIOGUI PRIVATE PROJECT_DESCRIPTION="FlexASIO GUI
 # The parent CMakeLists.txt sets /WX /W4 /analyze for the whole flexasio tree, tuned for
 # FlexASIO's own driver code. Qt headers and MOC-generated code aren't vetted against that
 # bar, so relax it here (later flags win over earlier ones on the MSVC command line).
-target_compile_options(FlexASIOGUI PRIVATE /WX- /W3 /analyze-)
+target_compile_options(FlexASIOGUI PRIVATE /WX- /W3 /analyze- /guard:cf /sdl)
+target_link_options(FlexASIOGUI PRIVATE /guard:cf /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /CETCOMPAT)
 target_link_libraries(FlexASIOGUI PRIVATE
     Qt6::Widgets
     FlexASIO_config
     FlexASIOUtil_shell
+	FlexASIOUtil_portaudio
     PortAudio::PortAudio
 )
 install(TARGETS FlexASIOGUI RUNTIME DESTINATION bin)
@@ -47,7 +49,26 @@ if(WINDEPLOYQT_EXECUTABLE)
     )
 endif()
 
-# windeployqt drops its output (DLLs and plugin subdirectories) next to the built exe, not
-# into the install tree - carry the whole directory over so the installed exe is runnable
-# on its own.
-install(DIRECTORY "$<TARGET_FILE_DIR:FlexASIOGUI>/" DESTINATION bin)
+# Release packaging is allowlisted. Do not install the build directory: it may contain
+# PDBs, logs, development plugins, or unrelated DLLs.
+get_filename_component(FLEXASIOGUI_QT_PREFIX "${Qt6_DIR}/../../.." ABSOLUTE)
+install(FILES
+    "${FLEXASIOGUI_QT_PREFIX}/bin/Qt6Core.dll"
+    "${FLEXASIOGUI_QT_PREFIX}/bin/Qt6Gui.dll"
+    "${FLEXASIOGUI_QT_PREFIX}/bin/Qt6Widgets.dll"
+    DESTINATION bin)
+install(FILES "${FLEXASIOGUI_QT_PREFIX}/plugins/platforms/qwindows.dll" DESTINATION bin/platforms)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(FlexASIOGUIConfigTests
+        tests/config_io_tests.cpp
+        core/config_io.cpp
+    )
+    target_link_libraries(FlexASIOGUIConfigTests PRIVATE
+        Qt6::Core
+        FlexASIO_config
+        FlexASIOUtil_shell
+    )
+    add_test(NAME FlexASIOGUIConfigTests COMMAND FlexASIOGUIConfigTests)
+endif()
