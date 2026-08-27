@@ -83,7 +83,12 @@ target_link_libraries(FlexASIO_flexasio
 add_library(FlexASIO SHARED dll.def flexasio.rc ../versioninfo.rc flexasio.manifest)
 target_compile_definitions(FlexASIO PRIVATE PROJECT_DESCRIPTION="FlexASIO ASIO Driver DLL")
 target_compile_options(FlexASIO PRIVATE /guard:cf /sdl)
-target_link_options(FlexASIO PRIVATE /guard:cf /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /CETCOMPAT)
+target_link_options(FlexASIO PRIVATE /guard:cf /DYNAMICBASE /NXCOMPAT /CETCOMPAT)
+# /HIGHENTROPYVA is a 64-bit-only linker flag; passing it to the x86 driver
+# makes MSVC fail with LNK1246.
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+	target_link_options(FlexASIO PRIVATE /HIGHENTROPYVA)
+endif()
 target_link_libraries(FlexASIO
 	PRIVATE FlexASIO_cflexasio
 	PRIVATE FlexASIO_portaudio
