@@ -18,7 +18,7 @@ WizardStyle=modern
 
 DefaultDirName={autopf}\FlexASIO
 AppendDefaultDirName=no
-ArchitecturesInstallIn64BitMode=x64
+ArchitecturesInstallIn64BitMode=x64compatible
 
 [Files]
 Source:"install\x64-Release\bin\FlexASIO.dll"; DestDir: "{app}\x64"; Flags: ignoreversion regserver 64bit; Check: Is64BitInstallMode

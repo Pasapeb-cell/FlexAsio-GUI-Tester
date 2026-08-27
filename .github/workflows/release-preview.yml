@@ -73,7 +73,7 @@ jobs:
           Copy-Item out/install/x86 src/out/install/x86-Release -Recurse
           Invoke-WebRequest https://aka.ms/vs/17/release/vc_redist.x64.exe -OutFile src/out/install/x64-Release/vc_redist.x64.exe
           choco install innosetup --yes --no-progress
-          cmake -DDISTRIBUTION_VERSION=0.1.0 -P src/installer.cmake
+          cmake -DDISTRIBUTION_VERSION:STRING=0.1.0 -P src/installer.cmake
           Copy-Item src/out/installer/FlexASIO-GUI-Tester-0.1.0-Setup.exe out/release/FlexASIO-GUI-Tester-0.1.0-Setup.exe
           Get-ChildItem out/release -File | Get-FileHash -Algorithm SHA256 | ForEach-Object { "$($_.Hash.ToLower())  $($_.Name)" } | Set-Content out/release/SHA256SUMS.txt
       - run: |
