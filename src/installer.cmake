@@ -1,4 +1,6 @@
-include(check_git_submodule.cmake)
+# Script-mode CMake does not search this script's directory for modules.
+# Use an absolute path so local and CI invocations behave the same way.
+include("${CMAKE_CURRENT_LIST_DIR}/check_git_submodule.cmake")
 check_git_submodule(dechamps_CMakeUtils)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/dechamps_CMakeUtils")
