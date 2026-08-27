@@ -3,7 +3,7 @@ if(FLEXASIOGUI_ALLOW_UNSUPPORTED_QT)
     message(WARNING "Building with an unsupported Qt runtime. This build must not be distributed as a release.")
     find_package(Qt6 CONFIG REQUIRED COMPONENTS Widgets)
 else()
-    find_package(Qt6 6.11.2 CONFIG REQUIRED COMPONENTS Widgets)
+    find_package(Qt6 6.10.3 CONFIG REQUIRED COMPONENTS Widgets)
 endif()
 
 set(CMAKE_AUTOMOC ON)
