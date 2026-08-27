@@ -127,4 +127,4 @@ jobs:
             *.zip
             SHA256SUMS.txt
             *.spdx.json
-            *.sigstore
+            *.sigstore.json
